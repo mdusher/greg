@@ -9,8 +9,9 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-var BotToken = os.Getenv("BOT_TOKEN")
-var BotPrefix = strings.Split(os.Getenv("BOT_PREFIX"),",")
+//
+// Greg
+//
 
 type Greg struct {
         Session *discordgo.Session
@@ -33,15 +34,32 @@ func (g *Greg) Start() {
 	discord, err := discordgo.New("Bot " + g.BotToken)
 	if err != nil {
 		fmt.Println("Error creating Discord session", err)
-		return
+		os.Exit(1)
 	}
 	g.Session = discord
+	g.Session.AddHandler(goGregGo)
+	// Do some listening, mate
+	err = g.Session.Open()
+	if err != nil {
+		fmt.Println("Error opening connection", err)
+		os.Exit(2)
+	}
+	fmt.Println("Greg is now Gregging in:")
+	channels := g.getAllChannels()
+	for _, channel := range channels {
+		fmt.Println("- (" + channel.Guild + ") " + channel.Name)
+	}
 }
 
-func (g *Greg) getAllChannels(s *discordgo.Session) ([]GregChannel) {
+func (g *Greg) Stop() {
+	fmt.Println("Greg is going to cease to Greg.")
+	g.Session.Close()
+}
+
+func (g *Greg) getAllChannels() ([]GregChannel) {
 	channelList := []GregChannel{}
-	for _, guild := range s.State.Guilds {
-		GuildChannels, _ := s.GuildChannels(guild.ID)
+	for _, guild := range g.Session.State.Guilds {
+		GuildChannels, _ := g.Session.GuildChannels(guild.ID)
 		for _, channel := range GuildChannels {
 			if channel.Type != discordgo.ChannelTypeGuildText {
 				continue
@@ -52,36 +70,23 @@ func (g *Greg) getAllChannels(s *discordgo.Session) ([]GregChannel) {
 	return channelList
 }
 
+//
+// Main
+//
+
+var BotToken = os.Getenv("BOT_TOKEN")
+var BotPrefix = strings.Split(os.Getenv("BOT_PREFIX"),",")
+
 func main() {
 	greg := Greg{BotToken: BotToken, BotPrefix: BotPrefix}
 	greg.Start()
-
-	// Do stuff with messages
-	greg.Session.AddHandler(goGregGo)
-
-	// Do some listening, mate
-	err := greg.Session.Open()
-	if err != nil {
-		fmt.Println("Error opening connection", err)
-		return
-	}
-
-	fmt.Println("Greg is now Gregging..")
-	fmt.Println("Greg is in:")
-	channels := greg.getAllChannels(greg.Session)
-	for _, channel := range channels {
-		fmt.Println("- (" + channel.Guild + ") " + channel.Name)
-	}
 
 	// Wait for the good old CTRL+C
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 	<-sc
 
-	fmt.Println("Greg is going to cease to Greg.")
-
-	// Clean exit
-	greg.Session.Close()
+	greg.Stop()
 }
 
 func goGregGo(s *discordgo.Session, m *discordgo.MessageCreate) {
