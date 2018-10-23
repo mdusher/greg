@@ -15,3 +15,9 @@ cd greg
 docker build -t greg .
 docker run -ti --rm -e "BOT_TOKEN=notarealbottokenbecausethatwouldbesilly" -e "BOT_PREFIX=greg" greg
 ```
+
+### Environment Variables
+| Variable   | Description                                            |
+|------------|--------------------------------------------------------|
+| BOT_TOKEN  | The Discord Bot Token                                  |
+| BOT_PREFIX | Comma separated list of prefixes for Greg to react to. |
