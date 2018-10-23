@@ -15,7 +15,7 @@ var BotPrefix = strings.Split(os.Getenv("BOT_PREFIX"),",")
 func main() {
 	discord, err := discordgo.New("Bot " + BotToken)
 	if err != nil {
-		fmt.Println("Error creating Discord client", err)
+		fmt.Println("Error creating Discord session", err)
 		return
 	}
 
@@ -51,7 +51,7 @@ func goGregGo(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	var isCommand, RestOfMessage = hasBotPrefix(m.Content, BotPrefix)
 	if isCommand {
-		s.ChannelMessageSend(m.ChannelID, "Roy is Greggin': "+ RestOfMessage)
+		s.ChannelMessageSend(m.ChannelID, "Greg recognises your Greggin' and you said: ```"+ RestOfMessage+"```")
 	}
 }
 
