@@ -12,25 +12,66 @@ import (
 var BotToken = os.Getenv("BOT_TOKEN")
 var BotPrefix = strings.Split(os.Getenv("BOT_PREFIX"),",")
 
-func main() {
-	discord, err := discordgo.New("Bot " + BotToken)
+type Greg struct {
+        Session *discordgo.Session
+        BotToken string
+        BotPrefix []string
+}
+
+type GregChannel struct {
+	Name string
+	Guild string
+}
+
+type GregMessage struct {
+	Prefixed bool
+	Command string
+	Params string
+}
+
+func (g *Greg) Start() {
+	discord, err := discordgo.New("Bot " + g.BotToken)
 	if err != nil {
 		fmt.Println("Error creating Discord session", err)
 		return
 	}
+	g.Session = discord
+}
+
+func (g *Greg) getAllChannels(s *discordgo.Session) ([]GregChannel) {
+	channelList := []GregChannel{}
+	for _, guild := range s.State.Guilds {
+		GuildChannels, _ := s.GuildChannels(guild.ID)
+		for _, channel := range GuildChannels {
+			if channel.Type != discordgo.ChannelTypeGuildText {
+				continue
+			}
+			channelList = append(channelList, GregChannel{Name: channel.Name, Guild: guild.Name})
+		}
+	}
+	return channelList
+}
+
+func main() {
+	greg := Greg{BotToken: BotToken, BotPrefix: BotPrefix}
+	greg.Start()
 
 	// Do stuff with messages
-	discord.AddHandler(goGregGo)
+	greg.Session.AddHandler(goGregGo)
 
 	// Do some listening, mate
-	err = discord.Open()
+	err := greg.Session.Open()
 	if err != nil {
 		fmt.Println("Error opening connection", err)
 		return
 	}
 
 	fmt.Println("Greg is now Gregging..")
-	getAllChannels(discord)
+	fmt.Println("Greg is in:")
+	channels := greg.getAllChannels(greg.Session)
+	for _, channel := range channels {
+		fmt.Println("- (" + channel.Guild + ") " + channel.Name)
+	}
 
 	// Wait for the good old CTRL+C
 	sc := make(chan os.Signal, 1)
@@ -40,7 +81,7 @@ func main() {
 	fmt.Println("Greg is going to cease to Greg.")
 
 	// Clean exit
-	discord.Close()
+	greg.Session.Close()
 }
 
 func goGregGo(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -49,42 +90,33 @@ func goGregGo(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	var isCommand, RestOfMessage = hasBotPrefix(m.Content, BotPrefix)
-	if isCommand {
-		s.ChannelMessageSend(m.ChannelID, "Greg recognises your Greggin' and you said: ```"+ RestOfMessage+"```")
+	var result = parseMessage(m.Content, BotPrefix)
+	if result.Prefixed {
+		s.ChannelMessageSend(m.ChannelID, "Greg recognises your Greggin' and your command was `"+result.Command+"` with parameters `"+result.Params+"`")
 	}
 }
 
-func hasBotPrefix(m string, prefixes []string) (bool, string) {
-	var SplitMessage = strings.SplitN(strings.ToLower(m), " ", 2);
-	var FirstToken = SplitMessage[0]
-	var RestOfMessage string
+func parseMessage(m string, prefixes []string) (GregMessage) {
+	result := GregMessage{Prefixed: false, Command: m, Params: ""}
+
+	SplitMessage := strings.SplitN(strings.ToLower(m), " ", 3);
+	MessagePrefix := SplitMessage[0]
+
 	if len(SplitMessage) > 1 {
-		RestOfMessage = SplitMessage[1]
-	} else {
-		RestOfMessage = ""
+		result.Command = SplitMessage[1]
 	}
-	if strings.Trim(RestOfMessage, " ") == "" {
-		return false, m
+	if len(SplitMessage) > 2 {
+		result.Params = SplitMessage[2]
+	}
+	if strings.Trim(result.Command, " ") == "" {
+		result.Prefixed = true
 	}
 	for _, p := range prefixes {
 		var LowerPrefix = strings.ToLower(p)
-		if strings.HasPrefix(FirstToken, LowerPrefix) || FirstToken == LowerPrefix {
-			return true, RestOfMessage
+		if strings.HasPrefix(MessagePrefix, LowerPrefix) || MessagePrefix == LowerPrefix {
+			result.Prefixed = true
 		}
 	}
-	return false, m
+	return result
 }
 
-func getAllChannels(s *discordgo.Session) {
-	fmt.Println("Greg is in:")
-	for _, guild := range s.State.Guilds {
-		GuildChannels, _ := s.GuildChannels(guild.ID)
-		for _, channel := range GuildChannels {
-			if channel.Type != discordgo.ChannelTypeGuildText {
-				continue
-			}
-			fmt.Println("- (" + guild.Name + ") " + channel.Name)
-		}
-	}
-}
