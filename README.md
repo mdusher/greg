@@ -1,8 +1,11 @@
 # Greg
 
 This is Greg.
+
 Greg is a Discord bot written in Go.
+
 Greg isn't really doing much right now. 
+
 Greg is just Greggin'
 
 ### Greg works like so
