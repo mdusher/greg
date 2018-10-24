@@ -78,6 +78,9 @@ func (g *Greg) Start() {
 	for _, channel := range channels {
 		log.Println("- (" + channel.Guild + ") " + channel.Name)
 	}
+	if os.Getenv("BOT_WEBHOOK_ID") != "" && os.Getenv("BOT_WEBHOOK_TOKEN") != "" {
+		log.Println("Webhook logs are enabled")
+	}
 }
 
 func (g *Greg) Stop() {
@@ -128,24 +131,22 @@ func goGregGo(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if result.Prefixed {
 		s.ChannelTyping(m.ChannelID)
 		if result.Command == "weather" || result.Command == "w" {
-			log.Println("<" + m.Author.Username + "> requested weather for '" + result.Params + "'")
-			greg, _ := talkToRoy("weather", string(m.Author.ID), result.Params);
-			greggo := GregWeather{}
-			json.Unmarshal([]byte(greg), &greggo)
+			logAction(s, "<" + m.Author.Username + "> requested weather for '" + result.Params + "'")
+			greggo := getGregWeather(m.Author.ID, result.Params)
 			embed := &discordgo.MessageEmbed{
 				Color: 0x0072bb,
 				Title: "Weather for "+greggo.Location,
 				Description: "It is currently " + greggo.Temp + "°C. Feels like " + greggo.Feels + "°C.\n"+greggo.Summary,
 				Fields: []*discordgo.MessageEmbedField{
-				        &discordgo.MessageEmbedField{Name:"Humidity", Value:greggo.Humidity},
-				        &discordgo.MessageEmbedField{Name:"Rain", Value:greggo.Rain},
-				        &discordgo.MessageEmbedField{Name:"Wind", Value:greggo.Wind},
+					&discordgo.MessageEmbedField{Name:"Humidity", Value:greggo.Humidity, Inline: true},
+					&discordgo.MessageEmbedField{Name:"Rain", Value:greggo.Rain, Inline: true},
+					&discordgo.MessageEmbedField{Name:"Wind", Value:greggo.Wind, Inline: true},
 			        },
 				Footer: &discordgo.MessageEmbedFooter{Text:"Requested by " + m.Author.Username + " Station: " + greggo.Station + " Last Update: " + greggo.Update, IconURL: m.Author.AvatarURL("")},
 			}
 			s.ChannelMessageSendEmbed(m.ChannelID, embed)
 		} else {
-			s.ChannelMessageSend(m.ChannelID, "Your command was `"+result.Command+"` with parameters `"+result.Params+"`")
+			s.ChannelMessageSend(m.ChannelID, "Greggo does not know what you're on about.")
 		}
 	}
 }
@@ -175,6 +176,13 @@ func talkToRoy(command string, user string, query string) (string, error) {
 	return string(body), nil
 }
 
+func getGregWeather(user string, params string) (GregWeather) {
+	result, _ := talkToRoy("weather", string(user), params);
+	gw := GregWeather{}
+	json.Unmarshal([]byte(result), &gw)
+	return gw
+}
+
 func parseMessage(m string, prefixes []string) (GregMessage) {
 	result := GregMessage{Prefixed: false, Command: m, Params: ""}
 
@@ -197,5 +205,22 @@ func parseMessage(m string, prefixes []string) (GregMessage) {
 		}
 	}
 	return result
+}
+
+func logAction(s *discordgo.Session, message string) {
+	log.Println(message)
+	logToDiscord(s, message)
+}
+
+func logToDiscord(s *discordgo.Session, message string) {
+	wid := os.Getenv("BOT_WEBHOOK_ID")
+	wtoken := os.Getenv("BOT_WEBOOK_TOKEN")
+	if wid != "" && wtoken != "" {
+		params := discordgo.WebhookParams{Username: "Greg", Content: "```"+message+"```"}
+		err := s.WebhookExecute(wid, wtoken, false, &params)
+	        if err != nil {
+			log.Println("logToDiscord failed: Unable to perform request")
+	        }
+	}
 }
 
