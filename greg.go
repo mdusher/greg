@@ -1,11 +1,15 @@
 package main
 
 import (
-	"fmt"
+//	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 	"strings"
+	"io/ioutil"
+	"net/http"
+	"encoding/json"
+	"log"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -30,10 +34,35 @@ type GregMessage struct {
 	Params string
 }
 
+type GregWeather struct {
+	Query string 			`json:"query"`
+	Coords GregWeatherCoords 	`json:"coords"`
+	Restrict_au string 		`json:"restrict_au"`
+	Api_key string 			`json:"api_key"`
+	Location string			`json:"location"`
+	Country string			`json:"country"`
+	Source string			`json:"source"`
+	Url string			`json:"url"`
+	Station string			`json:"station"`
+	Temp string			`json:"temp"`
+	Feels string			`json:"feels"`
+	Humidity string			`json:"humidity"`
+	Rain string			`json:"rain"`
+	Wind string			`json:"wind"`
+	Summary string			`json:"summary"`
+	Update string			`json:"update"`
+	Icon string			`json:"icon"`
+}
+
+type GregWeatherCoords struct {
+	Lat float32 `json:"lat"`
+	Lon float32 `json:"lon"`
+}
+
 func (g *Greg) Start() {
 	discord, err := discordgo.New("Bot " + g.BotToken)
 	if err != nil {
-		fmt.Println("Error creating Discord session", err)
+		log.Println("Error creating Discord session", err)
 		os.Exit(1)
 	}
 	g.Session = discord
@@ -41,18 +70,18 @@ func (g *Greg) Start() {
 	// Do some listening, mate
 	err = g.Session.Open()
 	if err != nil {
-		fmt.Println("Error opening connection", err)
+		log.Println("Error opening connection", err)
 		os.Exit(2)
 	}
-	fmt.Println("Greg is now Gregging in:")
+	log.Println("Greg is now Gregging in:")
 	channels := g.getAllChannels()
 	for _, channel := range channels {
-		fmt.Println("- (" + channel.Guild + ") " + channel.Name)
+		log.Println("- (" + channel.Guild + ") " + channel.Name)
 	}
 }
 
 func (g *Greg) Stop() {
-	fmt.Println("Greg is going to cease to Greg.")
+	log.Println("Greg is going to cease to Greg.")
 	g.Session.Close()
 }
 
@@ -97,8 +126,53 @@ func goGregGo(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	var result = parseMessage(m.Content, BotPrefix)
 	if result.Prefixed {
-		s.ChannelMessageSend(m.ChannelID, "Greg recognises your Greggin' and your command was `"+result.Command+"` with parameters `"+result.Params+"`")
+		s.ChannelTyping(m.ChannelID)
+		if result.Command == "weather" || result.Command == "w" {
+			log.Println("<" + m.Author.Username + "> requested weather for '" + result.Params + "'")
+			greg, _ := talkToRoy("weather", string(m.Author.ID), result.Params);
+			greggo := GregWeather{}
+			json.Unmarshal([]byte(greg), &greggo)
+			embed := &discordgo.MessageEmbed{
+				Color: 0x0072bb,
+				Title: "Weather for "+greggo.Location,
+				Description: "It is currently " + greggo.Temp + "°C. Feels like " + greggo.Feels + "°C.\n"+greggo.Summary,
+				Fields: []*discordgo.MessageEmbedField{
+				        &discordgo.MessageEmbedField{Name:"Humidity", Value:greggo.Humidity},
+				        &discordgo.MessageEmbedField{Name:"Rain", Value:greggo.Rain},
+				        &discordgo.MessageEmbedField{Name:"Wind", Value:greggo.Wind},
+			        },
+				Footer: &discordgo.MessageEmbedFooter{Text:"Requested by " + m.Author.Username + " Station: " + greggo.Station + " Last Update: " + greggo.Update, IconURL: m.Author.AvatarURL("")},
+			}
+			s.ChannelMessageSendEmbed(m.ChannelID, embed)
+		} else {
+			s.ChannelMessageSend(m.ChannelID, "Your command was `"+result.Command+"` with parameters `"+result.Params+"`")
+		}
 	}
+}
+
+func talkToRoy(command string, user string, query string) (string, error) {
+	client := &http.Client{}
+	req, err := http.NewRequest("GET","http://roy_api_1/", nil)
+	if err != nil {
+		return "greg is the worst", err
+	}
+	q := req.URL.Query()
+	q.Add("source", "discord")
+	q.Add("get", command)
+	q.Add("uniqname", user)
+	q.Add("query", query)
+	req.URL.RawQuery = q.Encode()
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "greg cant do", err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "greg cant read", err
+	}
+	return string(body), nil
 }
 
 func parseMessage(m string, prefixes []string) (GregMessage) {
@@ -108,7 +182,7 @@ func parseMessage(m string, prefixes []string) (GregMessage) {
 	MessagePrefix := SplitMessage[0]
 
 	if len(SplitMessage) > 1 {
-		result.Command = SplitMessage[1]
+		result.Command = strings.ToLower(SplitMessage[1])
 	}
 	if len(SplitMessage) > 2 {
 		result.Params = SplitMessage[2]
