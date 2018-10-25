@@ -17,7 +17,9 @@ docker run -ti --rm -e "BOT_TOKEN=notarealbottokenbecausethatwouldbesilly" -e "B
 ```
 
 ### Environment Variables
-| Variable   | Description                                            |
-|------------|--------------------------------------------------------|
-| BOT_TOKEN  | The Discord Bot Token                                  |
-| BOT_PREFIX | Comma separated list of prefixes for Greg to react to. |
+| Variable          | Description                                                       |
+|-------------------|-------------------------------------------------------------------|
+| BOT_TOKEN         | The Discord Bot Token                                             |
+| BOT_PREFIX        | Comma separated list of prefixes for Greg to react to.            |
+| BOT_WEBHOOK_ID    | (optional) Discord Webhook ID for logging to a Discord channel    |
+| BOT_WEBHOOK_TOKEN | (optional) Discord Webhook Token for logging to a Discord channel |
